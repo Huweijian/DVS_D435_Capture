@@ -25,10 +25,15 @@ int D435Main(const string folder)
     stereo.set_option(rs2_option::RS2_OPTION_ENABLE_AUTO_EXPOSURE, 1);
     stereo.set_option(rs2_option::RS2_OPTION_EMITTER_ENABLED, 0);
 
+	// get intrinsic
+	// 425.061 425.061 424.694 244.09
+	cout << "D435 intrinsic (fx, fy, cx, cy): " ;
+	auto const K = pipe.get_active_profile().get_stream(RS2_STREAM_INFRARED).as<rs2::video_stream_profile>().get_intrinsics();
+	cout << K.fx << " " << K.fy << " " << K.ppx << " " << K.ppy << endl;
+
     // writer
 	string folder_img = (folder + "/D435_Img");
     mkdir(folder_img.c_str(), ACCESSPERMS);
-    
     ofstream of(string(folder)+"/D435_time.txt");
 
     // S.T.A.R.T
