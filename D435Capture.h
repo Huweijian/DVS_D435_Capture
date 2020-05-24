@@ -1,3 +1,4 @@
 #pragma once
 
-int D435Main();
+#include <string>
+int D435Main(const std::string folder);

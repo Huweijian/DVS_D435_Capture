@@ -1,4 +1,4 @@
-SET(PROJECT_NAME DVS-cap)
+SET(PROJECT_NAME Capture)
 
 PROJECT(${PROJECT_NAME})
 CMAKE_MINIMUM_REQUIRED(VERSION 2.6)
@@ -56,5 +56,5 @@ set(FILES
 
 
 link_directories(${SEE_LIB_DIRS})
-add_executable(capturer ${FILES})
-target_link_libraries(capturer  ${OpenCV_LIBS} ${SEE_LIBS} ${RS_LIBS})
+add_executable(${PROJECT_NAME} ${FILES})
+target_link_libraries(${PROJECT_NAME}  ${OpenCV_LIBS} ${SEE_LIBS} ${RS_LIBS})

@@ -6,9 +6,13 @@
 #include <mutex>
 #include <signal.h>
 #include <ostream>
+#include <thread>
+#include <chrono>
+#include <sys/stat.h>
 
 #include <opencv2/core/core.hpp>
 #include <opencv2/highgui/highgui.hpp>
+
 // Some global variables.
 std::atomic<bool> globalShutdown_g; // To trigger the shutdown of the process.
 cv::Mat frame_image_g;              // Most recent frame_image_g read from the driver.
@@ -27,17 +31,22 @@ class SimpleEventImage
 {
   public:
     SimpleEventImage() = delete;
-    SimpleEventImage(const uint16_t _sensor_height, const uint16_t _sensor_width) : event_image(_sensor_height, _sensor_width, CV_8UC1, cv::Scalar(127)), event_writer("out.data", std::ios::binary){};
+    SimpleEventImage(const uint16_t _sensor_height, const uint16_t _sensor_width, std::string folder) 
+    : event_image(_sensor_height, _sensor_width, CV_8UC1, cv::Scalar(127)), 
+    event_writer(folder+"/DVS.bin", std::ios::binary)
+    {};
 
     // Adds events to the image.
     void processEventPacket(const iness::PolarityEventPacket &_packet)
     {
         std::lock_guard<std::mutex> lock(event_image_mutex);
+        pack_num += _packet.size();
         for (auto &event : _packet)
         {
             // Get the pixel coordinate of the event.
             const uint16_t x = event.getX();
             const uint16_t y = event.getY();
+
             // Get the polarity of the event.
             const iness::Polarity polarity = event.getPolarity();
             BinPacket bin_data;
@@ -45,16 +54,14 @@ class SimpleEventImage
             bin_data.x = x;
             bin_data.y = y;
             bin_data.polar = (unsigned char)polarity;
-            // event_writer.write((char *)(&bin_data), 13);
+            event_writer.write((char *)(&bin_data), 13);
+
             // Display positive polarity events white and negative polarity events black.
             if (polarity == iness::Polarity::POS)
-            {
                 event_image.at<uchar>(y, x) = 255;
-            }
             else
-            {
                 event_image.at<uchar>(y, x) = 0;
-            }
+
         }
     }
 
@@ -67,10 +74,17 @@ class SimpleEventImage
         return output_image;
     }
 
+    int getPacketNum(){
+        int ret = pack_num;
+        pack_num = 0;
+        return ret;
+    }
+
   private:
     cv::Mat event_image;
     std::mutex event_image_mutex;
     std::ofstream event_writer;
+    std::atomic_int pack_num;
 };
 
 std::shared_ptr<SimpleEventImage> simple_event_image_ptr;
@@ -142,7 +156,8 @@ bool setUpShutdownSignalHandler()
 }
 
 
-int DVSMain(){
+int DVSMain(const std::string folder){
+    using namespace std;
     // Install signal handler for global shutdown.
     if (!setUpShutdownSignalHandler())
     {
@@ -160,20 +175,28 @@ int DVSMain(){
         return EXIT_FAILURE;
     }
     // Initialize the event image creator.
-    simple_event_image_ptr = std::make_shared<SimpleEventImage>(sees.dvsHeight(), sees.dvsWidth());
+    simple_event_image_ptr = std::make_shared<SimpleEventImage>(sees.dvsHeight(), sees.dvsWidth(), folder);
 
+	string folder_img = (folder + "/DVS_Img");
+    mkdir(folder_img.c_str(), ACCESSPERMS);
 
     printf("DVS is running ...\n");
-
     cv::Mat event_img;
+    int cnt = 0;
+    const int DUR_MS = 100;
     while (!globalShutdown_g)
     {
         event_img = simple_event_image_ptr->getImageAndReset();
-        if (!event_img.empty())
-        {
-            cv::imshow("Event", event_img);
+        if (!event_img.empty()){
+            char img_idx[10] = "";
+            sprintf(img_idx, "%05d", cnt);
+            imwrite(folder_img + "/" + string(img_idx) + ".png", event_img);
         }
-        cv::waitKey(30);
+
+        int pack_n = simple_event_image_ptr->getPacketNum();
+        std::chrono::milliseconds dur(DUR_MS);
+        std::this_thread::sleep_for(dur);
+        printf("DVS\t%d (%d packs in %d ms)\n", cnt++, pack_n, DUR_MS);
     }
     std::cout << "Shutdown successful.\n";
 

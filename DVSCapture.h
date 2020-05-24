@@ -1,3 +1,4 @@
 #pragma once
 
-int DVSMain();
+#include <string>
+int DVSMain(const std::string folder);
