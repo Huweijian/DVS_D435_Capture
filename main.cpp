@@ -23,10 +23,10 @@ int main(void)
 
     thread t1(DVSMain, folder);
 
-    thread t2(D435Main, folder);
+    // thread t2(D435Main, folder);
 
     t1.join();
-    t2.join();
+    // t2.join();
     cout << "Over" << endl;
     return 0;
 }

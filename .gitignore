@@ -6,3 +6,6 @@ CMakeCache.txt
 *.cmake
 Makefile
 Capture-*/
+include/
+*so*
+build/
