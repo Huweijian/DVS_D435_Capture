@@ -18,7 +18,7 @@ struct BinPacket
     uint64_t ts;
     uint16_t x;
     uint16_t y;
-    unsigned char polar;
+    unsigned char polar; // us
 };
 ```
  - 每隔100ms保存一张事件的累积图
