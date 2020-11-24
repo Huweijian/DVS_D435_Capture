@@ -15,10 +15,10 @@ SEES C++ SDK v1.5.1
 ```
 struct BinPacket
 {
-    uint64_t ts;
+    uint64_t ts;// us
     uint16_t x;
     uint16_t y;
-    unsigned char polar; // us
+    unsigned char polar; 
 };
 ```
  - 每隔100ms保存一张事件的累积图
