@@ -15,110 +15,33 @@
 
 // Some global variables.
 std::atomic<bool> globalShutdown_g; // To trigger the shutdown of the process.
-cv::Mat frame_image_g;              // Most recent frame_image_g read from the driver.
-std::mutex frame_image_mutex_g;     // Mutex to protect the frame image access.
+std::ofstream of;
 
-// SimpleEventImage accumulates events into an image until the image is read.
-struct BinPacket
+void ImuPacketCallback(iness::Imu6EventPacket &_packet)
 {
-    uint64_t ts;
-    uint16_t x;
-    uint16_t y;
-    unsigned char polar;
-};
-
-class SimpleEventImage
-{
-  public:
-    SimpleEventImage() = delete;
-    SimpleEventImage(const uint16_t _sensor_height, const uint16_t _sensor_width, std::string folder) 
-    : event_image(_sensor_height, _sensor_width, CV_8UC1, cv::Scalar(127)), 
-    event_writer(folder+"/DVS.bin", std::ios::binary)
-    {};
-
-    // Adds events to the image.
-    void processEventPacket(const iness::PolarityEventPacket &_packet)
-    {
-        std::lock_guard<std::mutex> lock(event_image_mutex);
-        pack_num += _packet.size();
-        for (auto &event : _packet)
-        {
-            // Get the pixel coordinate of the event.
-            const uint16_t x = event.getX();
-            const uint16_t y = event.getY();
-
-            // Get the polarity of the event.
-            const iness::Polarity polarity = event.getPolarity();
-            BinPacket bin_data;
-            bin_data.ts = event.getTimestampUs(_packet.tsOverflowCount());
-            bin_data.x = x;
-            bin_data.y = y;
-            bin_data.polar = (unsigned char)polarity;
-            event_writer.write((char *)(&bin_data), 13);
-
-            // Display positive polarity events white and negative polarity events black.
-            if (polarity == iness::Polarity::POS)
-                event_image.at<uchar>(y, x) = 255;
-            else
-                event_image.at<uchar>(y, x) = 0;
-
-        }
-    }
-
-    // Reads the image and resets it.
-    cv::Mat getImageAndReset()
-    {
-        std::lock_guard<std::mutex> lock(event_image_mutex);
-        cv::Mat output_image = event_image.clone();
-        event_image = cv::Mat(event_image.rows, event_image.cols, CV_8UC1, cv::Scalar(127));
-        return output_image;
-    }
-
-    int getPacketNum(){
-        int ret = pack_num;
-        pack_num = 0;
-        return ret;
-    }
-
-  private:
-    cv::Mat event_image;
-    std::mutex event_image_mutex;
-    std::ofstream event_writer;
-    std::atomic_int pack_num;
-};
-
-std::shared_ptr<SimpleEventImage> simple_event_image_ptr;
-
-// Thread safe frame_image_g image setter.
-void setFrameImage(const cv::Mat &_new_frame_image)
-{
-    std::lock_guard<std::mutex> lock(frame_image_mutex_g);
-    frame_image_g = _new_frame_image;
-}
-
-// Thread safe frame_image_g image getter.
-void getFrameImage(cv::Mat &_frame_image)
-{
-    std::lock_guard<std::mutex> lock(frame_image_mutex_g);
-    _frame_image = frame_image_g;
-}
-
-void polarityEventPacketCallback(iness::PolarityEventPacket &_packet)
-{
+    static int last_sec = -1;
     // How to iterate through the event packet and retrieve the timestamp of the events.
-    // for(auto& event : _packet)
-    // {
-    //  // Get the timestamp of the event.
-    //  iness::time::TimeUs ts = event.getTimestampUs(_packet.tsOverflowCount());
-    //  // Get the pixel coordinates of the event.
-    //  uint16_t x = event.getX();
-    //  uint16_t y = event.getY();
-    //}
-
-    // Process packet for the event image visualization.
-    if (simple_event_image_ptr)
+    for(auto& event : _packet)
     {
-        simple_event_image_ptr->processEventPacket(_packet);
+        // Get the timestamp of the event.
+        iness::time::TimeUs ts = event.getTimestampUs(_packet.header().event_ts_overflow);
+        // Get the pixel coordinates of the event.
+        float ax = event.getAccelerationX();
+        float ay = event.getAccelerationY();
+        float az = event.getAccelerationZ();
+        float gx = event.getGyroX();
+        float gy = event.getGyroY();
+        float gz = event.getGyroZ();
+        char tmp[100] = "";
+        sprintf(tmp, "%ld, %f, %f, %f, %f, %f, %f\n", ts, ax, ay, az, gx, gy, gz);
+        of << tmp;
+        if(ts / 1000000 != last_sec){
+            last_sec = ts / 1000000;
+            printf("Captured %ds: %s", last_sec, tmp);
+            if(last_sec > 60*125){
+                exit(0);
+            }
+        }
     }
 }
 
@@ -164,39 +87,29 @@ int DVSMain(const std::string folder){
         return EXIT_FAILURE;
     }
 
+    of.open(folder+"/imu.txt");
+
     // Set up the device and processing callbacks.
     iness::device::Sees sees;
-    sees.setImuEnabled(false);
+    sees.setImuEnabled(true);
+    sees.setDvsEnabled(true);
     sees.setApsEnabled(false);
-    sees.registerPolarityEventPacketCallback(std::bind(polarityEventPacketCallback, std::placeholders::_1));
+    sees.registerImu6EventPacketCallback(std::bind(ImuPacketCallback, std::placeholders::_1));
+    
     // Start the device driver.
     if (!sees.start())
     {
         return EXIT_FAILURE;
     }
-    // Initialize the event image creator.
-    simple_event_image_ptr = std::make_shared<SimpleEventImage>(sees.dvsHeight(), sees.dvsWidth(), folder);
 
-	string folder_img = (folder + "/DVS_Img");
-    mkdir(folder_img.c_str(), ACCESSPERMS);
 
-    printf("DVS is running ...\n");
-    cv::Mat event_img;
     int cnt = 0;
-    const int DUR_MS = 100;
+    const int DUR_MS = 1000;
+
     while (!globalShutdown_g)
     {
-        event_img = simple_event_image_ptr->getImageAndReset();
-        if (!event_img.empty()){
-            char img_idx[10] = "";
-            sprintf(img_idx, "%05d", cnt);
-            imwrite(folder_img + "/" + string(img_idx) + ".png", event_img);
-        }
-
-        int pack_n = simple_event_image_ptr->getPacketNum();
         std::chrono::milliseconds dur(DUR_MS);
         std::this_thread::sleep_for(dur);
-        printf("DVS\t%d (%d packs in %d ms)\n", cnt++, pack_n, DUR_MS);
     }
     std::cout << "Shutdown successful.\n";
 
