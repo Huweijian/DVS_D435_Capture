@@ -47,7 +47,7 @@ void ImuPacketCallback(iness::Imu6EventPacket &_packet)
 
         if(ts / 1000000 != last_sec){
             last_sec = ts / 1000000;
-            printf("Capture imu %d s\n", last_sec);
+            printf("Capture imu %d second\n", last_sec);
         }
     }
 }
@@ -117,19 +117,20 @@ void polarityEventPacketCallback(iness::PolarityEventPacket &_packet)
     }
 
     bag.write("/dvs/events", hd.stamp, event_msgs);
-    printf("e(%lu) ", _packet.size());
+    // printf("e(%lu) ", _packet.size());
 
 }
 
 
 int DVSMain(const std::string folder){
-    bag.open(folder + "/dvs.bag", rosbag::bagmode::Write);
+    bag.open(folder + "-dvs.bag", rosbag::bagmode::Write);
 
     // Set up the device and processing callbacks.
     iness::device::Sees sees;
     sees.setImuEnabled(true);
     sees.setApsEnabled(true);
     sees.setDvsEnabled(true);
+    sees.setAutoExposureEnabled(true);
 
     sees.registerPolarityEventPacketCallback(std::bind(polarityEventPacketCallback, std::placeholders::_1));
     sees.registerImu6EventPacketCallback(std::bind(ImuPacketCallback, std::placeholders::_1));

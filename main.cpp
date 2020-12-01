@@ -15,7 +15,7 @@ int main(void)
 	sprintf(folder_c, "Capture-%ld", now);
 	string folder(folder_c);
     // experimental::filesystem::create_directories(folder);
-    mkdir(folder.c_str(), ACCESSPERMS);
+    // mkdir(folder.c_str(), ACCESSPERMS);
 
     thread t1(DVSMain, folder);
     // thread t2(D435Main, folder);
