@@ -23,29 +23,24 @@ endif()
 	
 set(EXECUTABLE_OUTPUT_PATH bin)
 
-# required librarie
-
-# optional libraries
 find_package(OpenCV REQUIRED)
+find_package(rosbag REQUIRED)
+find_package(cv_bridge REQUIRED)
 
-include_directories(
-  ${PROJECT_SOURCE_DIR}
-) 
-
-set(SEE_INCLUDE_DIRS /home/opt304/Dev/sees_sdk-v1.5.1/libiness/include)
-set(SEE_LIB_DIRS /home/opt304/Dev/sees_sdk-v1.5.1/libiness/lib/linux64)
+set(SEE_INCLUDE_DIRS /home/hwj23/Dev/sees_sdk-v1.6.0/libiness/include)
+set(SEE_LIB_DIRS /home/hwj23/Dev/sees_sdk-v1.6.0/libiness/lib/linux64)
 set(SEE_LIBS iness)
 set(RS_LIBS realsense2)
 
-# decide if we have openCV
-if (OpenCV_FOUND)
-	message("--- found OpenCV")
-	include_directories( ${OpenCV_INCLUDE_DIRS} ${SEE_INCLUDE_DIRS} )
-	# message( ${OpenCV_LIB} )
-	
-else ()
-	message("--- could not find OpenCV")
-endif ()
+include_directories(
+	${PROJECT_SOURCE_DIR}
+	${OpenCV_INCLUDE_DIRS}
+	${SEE_INCLUDE_DIRS}
+	${rosbag_INCLUDE_DIRS}
+	${cv_bridge_INCLUDE_DIRS}
+) 
+
+# message(WARNING ${rostime_INCLUDE_DIRS})
 
 
 set(FILES 
@@ -57,4 +52,4 @@ set(FILES
 
 link_directories(${SEE_LIB_DIRS})
 add_executable(${PROJECT_NAME} ${FILES})
-target_link_libraries(${PROJECT_NAME}  ${OpenCV_LIBS} ${SEE_LIBS} ${RS_LIBS})
+target_link_libraries(${PROJECT_NAME}  ${OpenCV_LIBS} ${SEE_LIBS} ${RS_LIBS} ${rosbag_LIBRARIES} ${cv_bridge_LIBRARIES} )

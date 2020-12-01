@@ -13,190 +13,144 @@
 #include <opencv2/core/core.hpp>
 #include <opencv2/highgui/highgui.hpp>
 
-// Some global variables.
-std::atomic<bool> globalShutdown_g; // To trigger the shutdown of the process.
-cv::Mat frame_image_g;              // Most recent frame_image_g read from the driver.
-std::mutex frame_image_mutex_g;     // Mutex to protect the frame image access.
+#include <rosbag/bag.h>
+#include <sensor_msgs/Imu.h>
+#include <sensor_msgs/Image.h>
+#include <dvs_msgs/EventArray.h>
+#include <cv_bridge/cv_bridge.h>
 
-// SimpleEventImage accumulates events into an image until the image is read.
-struct BinPacket
+rosbag::Bag bag;
+int dvs_height;
+int dvs_width;
+const unsigned int DVS_START_CAP = 1e6; // 1 sec
+
+void ImuPacketCallback(iness::Imu6EventPacket &_packet)
 {
-    uint64_t ts;
-    uint16_t x;
-    uint16_t y;
-    unsigned char polar;
-};
-
-class SimpleEventImage
-{
-  public:
-    SimpleEventImage() = delete;
-    SimpleEventImage(const uint16_t _sensor_height, const uint16_t _sensor_width, std::string folder) 
-    : event_image(_sensor_height, _sensor_width, CV_8UC1, cv::Scalar(127)), 
-    event_writer(folder+"/DVS.bin", std::ios::binary)
-    {};
-
-    // Adds events to the image.
-    void processEventPacket(const iness::PolarityEventPacket &_packet)
+    static int last_sec = -1;
+    static unsigned int imu_seq = 0;
+    // How to iterate through the event packet and retrieve the timestamp of the events.
+    for(auto& event : _packet)
     {
-        std::lock_guard<std::mutex> lock(event_image_mutex);
-        pack_num += _packet.size();
-        for (auto &event : _packet)
-        {
-            // Get the pixel coordinate of the event.
-            const uint16_t x = event.getX();
-            const uint16_t y = event.getY();
+        // Get the timestamp of the event.
+        iness::time::TimeUs ts = event.getTimestampUs(_packet.header().event_ts_overflow);
+        if(ts < DVS_START_CAP) continue;
+        sensor_msgs::Imu imu;
+        imu.header.seq = imu_seq++;
+        imu.header.stamp = ros::Time(ts/1e6);
+        imu.linear_acceleration.x = event.getAccelerationX();
+        imu.linear_acceleration.y = event.getAccelerationY();
+        imu.linear_acceleration.z = event.getAccelerationZ();
+        imu.angular_velocity.x = event.getGyroX();
+        imu.angular_velocity.y = event.getGyroY();
+        imu.angular_velocity.z = event.getGyroZ();
+        bag.write("/dvs/imu",imu.header.stamp, imu);
 
-            // Get the polarity of the event.
-            const iness::Polarity polarity = event.getPolarity();
-            BinPacket bin_data;
-            bin_data.ts = event.getTimestampUs(_packet.tsOverflowCount());
-            bin_data.x = x;
-            bin_data.y = y;
-            bin_data.polar = (unsigned char)polarity;
-            event_writer.write((char *)(&bin_data), 13);
-
-            // Display positive polarity events white and negative polarity events black.
-            if (polarity == iness::Polarity::POS)
-                event_image.at<uchar>(y, x) = 255;
-            else
-                event_image.at<uchar>(y, x) = 0;
-
+        if(ts / 1000000 != last_sec){
+            last_sec = ts / 1000000;
+            printf("Capture imu %d s\n", last_sec);
         }
     }
-
-    // Reads the image and resets it.
-    cv::Mat getImageAndReset()
-    {
-        std::lock_guard<std::mutex> lock(event_image_mutex);
-        cv::Mat output_image = event_image.clone();
-        event_image = cv::Mat(event_image.rows, event_image.cols, CV_8UC1, cv::Scalar(127));
-        return output_image;
-    }
-
-    int getPacketNum(){
-        int ret = pack_num;
-        pack_num = 0;
-        return ret;
-    }
-
-  private:
-    cv::Mat event_image;
-    std::mutex event_image_mutex;
-    std::ofstream event_writer;
-    std::atomic_int pack_num;
-};
-
-std::shared_ptr<SimpleEventImage> simple_event_image_ptr;
-
-// Thread safe frame_image_g image setter.
-void setFrameImage(const cv::Mat &_new_frame_image)
-{
-    std::lock_guard<std::mutex> lock(frame_image_mutex_g);
-    frame_image_g = _new_frame_image;
 }
 
-// Thread safe frame_image_g image getter.
-void getFrameImage(cv::Mat &_frame_image)
+
+void FrameCallback(iness::FrameEventPacket &_packet)
 {
-    std::lock_guard<std::mutex> lock(frame_image_mutex_g);
-    _frame_image = frame_image_g;
+    using namespace cv;
+    static unsigned int frame_seq = 0;
+
+    for(auto& frm : _packet)
+    {
+        iness::time::TimeUs ts = frm.getTimestampUs(_packet.header().event_ts_overflow);
+        if(ts < DVS_START_CAP) continue;
+        Mat img = frm.getImage();
+        if(img.empty()) {
+            printf(" * WARNING! empty frame\n");
+            continue;
+        }
+        imshow("img", img); 
+        if(waitKey(1) == 'q'){
+            bag.close();
+            exit(0);
+        }
+
+        if(img.type() != CV_16UC1){
+            std::cout << "image is not 16UC1 !" << img.type() << std::endl;
+        }
+
+        std_msgs::Header hd;
+        hd.seq = frame_seq++;
+        hd.stamp = ros::Time(ts / 1e6);
+        
+        cv_bridge::CvImage img_tmp(hd, "mono16", img);
+        sensor_msgs::Image img_msg;
+        img_tmp.toImageMsg(img_msg);
+        bag.write("/dvs/image_raw", hd.stamp, img_msg);
+    }
 }
 
 void polarityEventPacketCallback(iness::PolarityEventPacket &_packet)
 {
-    // How to iterate through the event packet and retrieve the timestamp of the events.
-    // for(auto& event : _packet)
-    // {
-    //  // Get the timestamp of the event.
-    //  iness::time::TimeUs ts = event.getTimestampUs(_packet.tsOverflowCount());
-    //  // Get the pixel coordinates of the event.
-    //  uint16_t x = event.getX();
-    //  uint16_t y = event.getY();
-    //}
+    static unsigned int evt_seq = 0;
 
-    // Process packet for the event image visualization.
-    if (simple_event_image_ptr)
-    {
-        simple_event_image_ptr->processEventPacket(_packet);
-    }
-}
+    iness::time::TimeUs ts = _packet.first().getTimestampUs(_packet.tsOverflowCount());
+    if(ts < DVS_START_CAP) return;
+    std_msgs::Header hd;
+    hd.seq = evt_seq++;
+    hd.stamp = ros::Time(ts / 1e6);
 
-static void globalShutdownSignalHandler(int _signal)
-{
-    // Simply set the running flag to false on SIGTERM and SIGINT (CTRL+C) for global shutdown.
-    if (_signal == SIGTERM || _signal == SIGINT)
-    {
-        globalShutdown_g = true;
-    }
-}
+    dvs_msgs::EventArray event_msgs;
+    event_msgs.header = hd;
+    event_msgs.height = dvs_height;
+    event_msgs.width = dvs_width;
 
-bool setUpShutdownSignalHandler()
-{
-    // Install signal handler for global shutdown.
-    globalShutdown_g = false;
-    struct sigaction shutdownAction;
-    shutdownAction.sa_handler = &globalShutdownSignalHandler;
-    shutdownAction.sa_flags = 0;
-    sigemptyset(&shutdownAction.sa_mask);
-    sigaddset(&shutdownAction.sa_mask, SIGTERM);
-    sigaddset(&shutdownAction.sa_mask, SIGINT);
+    for (auto &evt : _packet) {
+        // Get the timestamp of the event.
+        iness::time::TimeUs ts = evt.getTimestampUs(_packet.tsOverflowCount());
 
-    if (sigaction(SIGTERM, &shutdownAction, NULL) == -1)
-    {
-        return false;
+        dvs_msgs::Event event_msg;
+        event_msg.ts = ros::Time(ts / 1e6);
+        event_msg.polarity = (uint8_t)(evt.getPolarity());
+        event_msg.x = evt.getX();
+        event_msg.y = evt.getY();
+        
+        event_msgs.events.push_back(event_msg);
     }
 
-    if (sigaction(SIGINT, &shutdownAction, NULL) == -1)
-    {
-        return false;
-    }
+    bag.write("/dvs/events", hd.stamp, event_msgs);
+    printf("e(%lu) ", _packet.size());
 
-    return true;
 }
 
 
 int DVSMain(const std::string folder){
-    using namespace std;
-    // Install signal handler for global shutdown.
-    if (!setUpShutdownSignalHandler())
-    {
-        return EXIT_FAILURE;
-    }
+    bag.open(folder + "/dvs.bag", rosbag::bagmode::Write);
 
     // Set up the device and processing callbacks.
     iness::device::Sees sees;
-    sees.setImuEnabled(false);
-    sees.setApsEnabled(false);
+    sees.setImuEnabled(true);
+    sees.setApsEnabled(true);
+    sees.setDvsEnabled(true);
+
     sees.registerPolarityEventPacketCallback(std::bind(polarityEventPacketCallback, std::placeholders::_1));
+    sees.registerImu6EventPacketCallback(std::bind(ImuPacketCallback, std::placeholders::_1));
+    sees.registerFrameEventPacketCallback(std::bind(FrameCallback, std::placeholders::_1));
+
     // Start the device driver.
-    if (!sees.start())
-    {
+    if (!sees.start()){
         return EXIT_FAILURE;
     }
-    // Initialize the event image creator.
-    simple_event_image_ptr = std::make_shared<SimpleEventImage>(sees.dvsHeight(), sees.dvsWidth(), folder);
 
-	string folder_img = (folder + "/DVS_Img");
-    mkdir(folder_img.c_str(), ACCESSPERMS);
+    // Initialize the event image creator.
+    dvs_height = sees.dvsHeight();
+    dvs_width = sees.dvsWidth();
+    
 
     printf("DVS is running ...\n");
-    cv::Mat event_img;
-    int cnt = 0;
-    const int DUR_MS = 100;
-    while (!globalShutdown_g)
+    const int DUR_MS = 1000;
+    while (1)
     {
-        event_img = simple_event_image_ptr->getImageAndReset();
-        if (!event_img.empty()){
-            char img_idx[10] = "";
-            sprintf(img_idx, "%05d", cnt);
-            imwrite(folder_img + "/" + string(img_idx) + ".png", event_img);
-        }
-
-        int pack_n = simple_event_image_ptr->getPacketNum();
         std::chrono::milliseconds dur(DUR_MS);
         std::this_thread::sleep_for(dur);
-        printf("DVS\t%d (%d packs in %d ms)\n", cnt++, pack_n, DUR_MS);
     }
     std::cout << "Shutdown successful.\n";
 
