@@ -37,12 +37,12 @@ void ImuPacketCallback(iness::Imu6EventPacket &_packet)
         sensor_msgs::Imu imu;
         imu.header.seq = imu_seq++;
         imu.header.stamp = ros::Time(ts/1e6);
-        imu.linear_acceleration.x = event.getAccelerationX();
-        imu.linear_acceleration.y = event.getAccelerationY();
-        imu.linear_acceleration.z = event.getAccelerationZ();
-        imu.angular_velocity.x = event.getGyroX();
-        imu.angular_velocity.y = event.getGyroY();
-        imu.angular_velocity.z = event.getGyroZ();
+        imu.linear_acceleration.x = event.getAccelerationX() * 9.81;
+        imu.linear_acceleration.y = event.getAccelerationY() * 9.81;
+        imu.linear_acceleration.z = event.getAccelerationZ() * 9.81;
+        imu.angular_velocity.x = event.getGyroX() / 180.0 * M_PI;
+        imu.angular_velocity.y = event.getGyroY() / 180.0 * M_PI;
+        imu.angular_velocity.z = event.getGyroZ() / 180.0 * M_PI;;
         bag.write("/dvs/imu",imu.header.stamp, imu);
 
         if(ts / 1000000 != last_sec){

@@ -27,8 +27,8 @@ find_package(OpenCV REQUIRED)
 find_package(rosbag REQUIRED)
 find_package(cv_bridge REQUIRED)
 
-set(SEE_INCLUDE_DIRS /home/hwj23/Dev/sees_sdk-v1.6.0/libiness/include)
-set(SEE_LIB_DIRS /home/hwj23/Dev/sees_sdk-v1.6.0/libiness/lib/linux64)
+set(SEE_INCLUDE_DIRS /home/hwj23/Dev/sees_sdk-v1.5.1/libiness/include)
+set(SEE_LIB_DIRS /home/hwj23/Dev/sees_sdk-v1.5.1/libiness/lib/linux64)
 set(SEE_LIBS iness)
 set(RS_LIBS realsense2)
 
