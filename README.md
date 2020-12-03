@@ -1,11 +1,11 @@
 # DVS_D435_Capture
 
 ## 运行环境
+[ros](http://wiki.ros.org/)
 [librealsense build 2.34.0](https://github.com/IntelRealSense/librealsense/blob/master/doc/distribution_linux.md)   
 [RealSense D435 Firmware 5.12.3](https://dev.intelrealsense.com/docs/firmware-releases)   
-SEES C++ SDK v1.5.1，相见组内share
-[dvs_msgs](https://github.com/uzh-rpg/rpg_dvs_ros/tree/master/dvs_msgs)
-[ros kinetic](http://wiki.ros.org/)
+[dvs_msgs](https://github.com/uzh-rpg/rpg_dvs_ros/tree/master/dvs_msgs)  
+SEES C++ SDK v1.5.1，相见组内share  
 
 ## 数据保存 
 保存在"Capture-时间戳"文件夹中
