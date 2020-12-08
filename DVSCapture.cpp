@@ -22,7 +22,7 @@
 rosbag::Bag bag;
 int dvs_height;
 int dvs_width;
-const unsigned int DVS_START_CAP = 1e6; // 1 sec
+const unsigned int DVS_START_CAP = 5e6; // 1 sec
 
 void ImuPacketCallback(iness::Imu6EventPacket &_packet)
 {
@@ -61,12 +61,19 @@ void FrameCallback(iness::FrameEventPacket &_packet)
     for(auto& frm : _packet)
     {
         iness::time::TimeUs ts = frm.getTimestampUs(_packet.header().event_ts_overflow);
-        if(ts < DVS_START_CAP) continue;
+
         Mat img = frm.getImage();
         if(img.empty()) {
             printf(" * WARNING! empty frame\n");
             continue;
         }
+
+        if(ts < DVS_START_CAP) {
+            putText(img, std::to_string(ts/1e6), {100, 100}, FONT_HERSHEY_PLAIN, 3.0, 65535);
+            imshow("img", img); waitKey(1);
+            continue;
+        }
+
         imshow("img", img); 
         if(waitKey(1) == 'q'){
             bag.close();
