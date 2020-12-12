@@ -8,7 +8,7 @@
 using namespace std;
 int main(void)
 {
-	// folder creation
+	// create folder
 	time_t now;
 	time(&now);
 	char folder_c[100];
@@ -17,11 +17,18 @@ int main(void)
     // experimental::filesystem::create_directories(folder);
     // mkdir(folder.c_str(), ACCESSPERMS);
 
-    thread t1(DVSMain, folder);
-    // thread t2(D435Main, folder);
+    // multipe thread
 
-    t1.join();
+    // thread t1(DVSMain, folder);
+    // thread t2(D435Main, folder);
+    // t1.join();
     // t2.join();
+
+
+    // single thread
+
+    DVSMain(folder);
+
     cout << "Over" << endl;
     return 0;
 }
