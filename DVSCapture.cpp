@@ -141,7 +141,7 @@ int DVSMain(const std::string folder){
     sees.setDvsEnabled(true);
     sees.setAutoExposureEnabled(true);
     // sees.setAutoExposureMedianBrightness(0.6);
-    sees.setEventThreshold(50);
+    sees.setEventThreshold(55);
 
     sees.registerCallback(std::bind(polarityEventPacketCallback, std::placeholders::_1));
     sees.registerCallback(std::bind(ImuPacketCallback, std::placeholders::_1));
@@ -180,8 +180,10 @@ int DVSMain(const std::string folder){
         {
             std::lock_guard<std::mutex> lck(m_img);
             for(auto &img_msg : msg_img_buf){
-                if(img_msg.header.stamp.toSec() < DVS_START_CAP)
+                if(img_msg.header.stamp.toSec() < DVS_START_CAP/1e6){
+                    printf("skippppppppp a image at %f\n", img_msg.header.stamp.toSec() );
                     continue;
+                }
                 bag.write("/dvs/image_raw", img_msg.header.stamp, img_msg);
             }
             
