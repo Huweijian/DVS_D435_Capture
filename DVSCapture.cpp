@@ -27,10 +27,20 @@ std::vector<sensor_msgs::Imu> msg_imu_buf;
 dvs_msgs::EventArray msg_event_buf[1000];
 int n_event_buf = 0;
 std::mutex m_img, m_imu, m_evt;
+u_int32_t t0 = 0;
+std::chrono::high_resolution_clock::time_point tp0;
 
 int dvs_height;
 int dvs_width;
 const unsigned int DVS_START_CAP = 5e6; // 1 sec
+
+inline uint32_t utc_us_in_a_day(void){
+    using namespace std;
+    auto tp1 = chrono::high_resolution_clock().now();
+    double dt = chrono::duration_cast<chrono::microseconds>(tp1-tp0).count();
+    uint32_t ts = t0 + (uint32_t) (dt);
+    return ts;
+}
 
 void ImuPacketCallback(iness::Imu6EventPacket &_packet)
 {
@@ -71,6 +81,7 @@ void FrameCallback(iness::FrameEventPacket &_packet)
     for(auto& frm : _packet)
     {
         iness::time::TimeUs ts = frm.getTimestampUs(_packet.header().event_ts_overflow);
+        uint32_t utc = utc_us_in_a_day();
 
         Mat img = frm.getImage();
         if(img.empty()) {
@@ -85,6 +96,7 @@ void FrameCallback(iness::FrameEventPacket &_packet)
         std_msgs::Header hd;
         hd.seq = frame_seq++;
         hd.stamp = ros::Time(ts / 1e6);
+        hd.seq = utc; //TODO 这样对齐不太好
         
         cv_bridge::CvImage img_tmp(hd, "mono16", img);
         sensor_msgs::Image img_msg;
@@ -129,7 +141,17 @@ void polarityEventPacketCallback(iness::PolarityEventPacket &_packet)
 }
 
 
+
 int DVSMain(const std::string folder){
+
+    std::chrono::milliseconds slp(100);
+    for(int i=0; i<10; i++){
+        std::this_thread::sleep_for(slp);
+        auto tp0_tmp = std::chrono::high_resolution_clock().now();
+        tp0 = std::chrono::high_resolution_clock::from_time_t(std::chrono::high_resolution_clock::to_time_t(tp0_tmp));
+        t0 = (std::chrono::high_resolution_clock::to_time_t(tp0) % (60*60*24)) * 1e6;
+    }
+
     rosbag::Bag bag;
     bag.open(folder + "-dvs.bag", rosbag::bagmode::Write);
 
