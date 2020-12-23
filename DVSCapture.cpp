@@ -149,8 +149,9 @@ int DVSMain(const std::string folder){
         std::this_thread::sleep_for(slp);
         auto tp0_tmp = std::chrono::high_resolution_clock().now();
         tp0 = std::chrono::high_resolution_clock::from_time_t(std::chrono::high_resolution_clock::to_time_t(tp0_tmp));
-        t0 = (std::chrono::high_resolution_clock::to_time_t(tp0) % (60*60*24)) * 1e6;
+        t0 = (std::chrono::high_resolution_clock::to_time_t(tp0) % (60*60*24)) * 1e3;
     }
+    printf("UTC: %d sec (%d:%d:%d)\n", t0/1000, 8+(t0/1000/3600), (t0/1000%3600/60), (t0/1000%3600%60));
 
     rosbag::Bag bag;
     bag.open(folder + "-dvs.bag", rosbag::bagmode::Write);
