@@ -37,7 +37,7 @@ const unsigned int DVS_START_CAP = 5e6; // 1 sec
 inline uint32_t utc_us_in_a_day(void){
     using namespace std;
     auto tp1 = chrono::high_resolution_clock().now();
-    double dt = chrono::duration_cast<chrono::microseconds>(tp1-tp0).count();
+    double dt = chrono::duration_cast<chrono::milliseconds>(tp1-tp0).count();
     uint32_t ts = t0 + (uint32_t) (dt);
     return ts;
 }
