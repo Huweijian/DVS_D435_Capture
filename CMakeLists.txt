@@ -40,7 +40,7 @@ include_directories(
 	${cv_bridge_INCLUDE_DIRS}
 ) 
 
-# message(WARNING ${rostime_INCLUDE_DIRS})
+# message(WARNING ${OpenCV_INCLUDE_DIRS})
 
 
 set(FILES 

@@ -1,0 +1,25 @@
+<RCC>
+    <qresource prefix="/">
+        <file>arrow-right.png</file>
+        <file>document-open.png</file>
+        <file>media-record.png</file>
+        <file>process-stop.png</file>
+        <file>preferences-system.png</file>
+        <file>object-locked.png</file>
+        <file>object-unlocked.png</file>
+        <file>emblem-readonly.png</file>
+        <file>media-playback-pause.png</file>
+        <file>media-playback-start.png</file>
+        <file>media-playback-stop.png</file>
+        <file>media-seek-backward.png</file>
+        <file>media-seek-forward.png</file>
+        <file>media-playback-pause.svg</file>
+        <file>media-playback-start.svg</file>
+        <file>media-playback-stop.svg</file>
+        <file>media-playlist-repeat.svg</file>
+        <file>media-seek-backward.svg</file>
+        <file>media-seek-forward.svg</file>
+        <file>edit-delete.png</file>
+        <file>dialog-cancel.png</file>
+    </qresource>
+</RCC>

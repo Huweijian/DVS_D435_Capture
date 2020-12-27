@@ -8,3 +8,8 @@ Makefile
 Capture-*/
 build/
 *.bag
+*.o
+ui_*.h
+moc_*.cpp
+qrc_*.cpp
+*/sees_control
