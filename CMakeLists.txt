@@ -40,7 +40,7 @@ include_directories(
 	${cv_bridge_INCLUDE_DIRS}
 ) 
 
-# message(WARNING ${OpenCV_INCLUDE_DIRS})
+# message(WARNING ${rostime_INCLUDE_DIRS})
 
 
 set(FILES 
@@ -49,7 +49,10 @@ set(FILES
 	${PROJECT_SOURCE_DIR}/D435Capture.cpp 
 )
 
-
 link_directories(${SEE_LIB_DIRS})
+
 add_executable(${PROJECT_NAME} ${FILES})
 target_link_libraries(${PROJECT_NAME}  ${OpenCV_LIBS} ${SEE_LIBS} ${RS_LIBS} ${rosbag_LIBRARIES} ${cv_bridge_LIBRARIES} )
+
+add_executable(aedat_to_bag ${PROJECT_SOURCE_DIR}/aedat_to_bag.cpp)
+target_link_libraries(aedat_to_bag  ${OpenCV_LIBS} ${SEE_LIBS} ${RS_LIBS} ${rosbag_LIBRARIES} ${cv_bridge_LIBRARIES} )

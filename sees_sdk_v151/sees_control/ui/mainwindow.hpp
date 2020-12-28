@@ -148,7 +148,7 @@ private:
     void handleEventVisualization(std::shared_ptr<aedat::IEventPacket> _event_packet, unsigned int event_index);
 
     // Distribute event data to recording.
-    void handleEventPacketRecording(std::shared_ptr<aedat::IEventPacket> _event_packet);
+    void handleEventPacketRecording(std::shared_ptr<aedat::IEventPacket> _event_packet, double utc = 0.0);
 
     // Callback for data producers (driver or network).
     void eventPacketProducerCallback(std::shared_ptr<iness::aedat::IEventPacket> _event_packet);
@@ -163,6 +163,7 @@ private:
     QLabel *status_label_;
     VideoControls* video_controls_;
     DeviceControls* device_controls_;
+    std::ofstream utc_out;
 
     // status flags
     SeesControlState state_;
@@ -188,6 +189,7 @@ private:
     std::condition_variable data_input_buffer_cv_;
     std::atomic<bool> run_input_data_processing_thread_;
     std::queue<std::shared_ptr<aedat::IEventPacket>> data_input_buffer_;
+    std::deque<double> data_input_utc;
     std::thread input_data_processing_thread_;
 
     std::atomic<bool> recording_failed_is_processing_; //!< Used to prevent onRecordingFailed() slot to be called again before returning.

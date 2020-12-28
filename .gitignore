@@ -12,4 +12,6 @@ build/
 ui_*.h
 moc_*.cpp
 qrc_*.cpp
-*/sees_control
+sees_control
+!sees_control/
+*.ui.autosave

@@ -29,10 +29,17 @@
 
 #include <boost/filesystem.hpp>
 #include <chrono>
+#include <iomanip>
 
 const unsigned int MainWindow::desactivate_display_buffer_size_ = 60;
 
 constexpr int TCP_PORT = 9999;
+
+inline double get_utc(void){
+    auto tp = std::chrono::high_resolution_clock().now();
+    double utc = std::chrono::duration_cast<std::chrono::milliseconds>(tp.time_since_epoch()).count()/1e3;
+    return utc;
+}
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
@@ -181,7 +188,7 @@ bool MainWindow::switchToUsbDataOn()
 
         // Clear input buffer.
         std::queue<std::shared_ptr<aedat::IEventPacket>> empty_queue;
-        std::swap(data_input_buffer_, empty_queue );
+        std::swap(data_input_buffer_, empty_queue ); data_input_utc.clear();
 
         // Register data callbacks after the device is opened
         input_.deviceRegisterEventPacketCallback(std::bind(&MainWindow::eventPacketProducerCallback, this, std::placeholders::_1));
@@ -230,7 +237,7 @@ bool MainWindow::switchToNetworkDataOn()
         data_view_->clear();
         // Clear input buffer.
         std::queue<std::shared_ptr<aedat::IEventPacket>> empty_queue;
-        std::swap(data_input_buffer_, empty_queue );
+        std::swap(data_input_buffer_, empty_queue ); data_input_utc.clear();
 
         // Start data consumer.
         startInputDataProcessing();
@@ -341,6 +348,8 @@ void MainWindow::startRecording(const iness::aedat::AedatSourceInfo& _source_inf
                                 const std::vector<iness::serialization::AedatType>& _types_to_record,
                                 const QString _filename)
 {
+    utc_out.open(std::string("./") + QDateTime::currentDateTime().toString("'utc_'yyyy_MM_dd-hh_mm_ss'.txt'").toUtf8().constData());
+    utc_out << std::setprecision(13);
     if (_filename.isEmpty())
     {
         std::string _default_filename = std::string(".") + QDateTime::currentDateTime().toString("'temp_sees_control_recording_'yyyy_MM_dd-hh_mm_ss'.aedat'").toUtf8().constData();
@@ -575,7 +584,8 @@ void MainWindow::inputDataProcessingLoop()
             unsigned int input_buffer_size = 0;
             data_input_buffer_mutex_.lock();
             std::shared_ptr<aedat::IEventPacket> current_packet = data_input_buffer_.front();
-            data_input_buffer_.pop();
+            double utc = data_input_utc.front();
+            data_input_buffer_.pop(); data_input_utc.pop_front();
             input_buffer_size = data_input_buffer_.size();
             data_input_buffer_mutex_.unlock();
 
@@ -585,7 +595,7 @@ void MainWindow::inputDataProcessingLoop()
                 handleEventPacketVisualization(current_packet);
             }
 
-            handleEventPacketRecording(current_packet);
+            handleEventPacketRecording(current_packet, utc);
         }
     }
 }
@@ -673,10 +683,19 @@ void MainWindow::handleEventVisualization(std::shared_ptr<aedat::IEventPacket> _
     }
 }
 
-void MainWindow::handleEventPacketRecording(std::shared_ptr<aedat::IEventPacket> _event_packet)
+void MainWindow::handleEventPacketRecording(std::shared_ptr<aedat::IEventPacket> _event_packet, double utc)
 {
     if(output_.isRecording())
     {
+        // 保存时间戳
+        if (_event_packet->is(iness::serialization::AedatType::FRAME_EVENT)) {
+            iness::FrameEventPacket& frame_packet = *(_event_packet->interpretAs<iness::FrameEventPacket>());
+            for (auto& frame_event : frame_packet) {
+                double ts = frame_event.getTimestampUs(frame_packet.header().event_ts_overflow) / 1e6;
+                utc_out << ts << " " << utc << std::endl;
+            }
+        }
+
         output_.writePacket(_event_packet);
         if(!output_.isOk())
         {
@@ -685,10 +704,13 @@ void MainWindow::handleEventPacketRecording(std::shared_ptr<aedat::IEventPacket>
     }
 }
 
+
+
 void MainWindow::eventPacketProducerCallback(std::shared_ptr<iness::aedat::IEventPacket> _event_packet)
 {
     std::lock_guard<std::mutex> lock(data_input_buffer_mutex_);
     data_input_buffer_.push(_event_packet);
+    data_input_utc.push_back(get_utc());
     data_input_buffer_cv_.notify_all();
 }
 
