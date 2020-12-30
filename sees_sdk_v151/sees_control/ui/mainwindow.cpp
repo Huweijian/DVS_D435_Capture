@@ -348,6 +348,9 @@ void MainWindow::startRecording(const iness::aedat::AedatSourceInfo& _source_inf
                                 const std::vector<iness::serialization::AedatType>& _types_to_record,
                                 const QString _filename)
 {
+    if(utc_out.good()){
+        utc_out.close();
+    }
     utc_out.open(std::string("./") + QDateTime::currentDateTime().toString("'utc_'yyyy_MM_dd-hh_mm_ss'.txt'").toUtf8().constData());
     utc_out << std::setprecision(13);
     if (_filename.isEmpty())
