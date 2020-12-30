@@ -31,6 +31,8 @@ std::chrono::high_resolution_clock::time_point tp0;
 unsigned int dvs_height;
 unsigned int dvs_width;
 unordered_map<double, double> ts_to_utc;
+string aedat_file ;
+string utc_file ;
 
 inline uint32_t utc_us_in_a_day(void){
     using namespace std;
@@ -74,8 +76,12 @@ inline void frameEventPacketCallback(rosbag::Bag &bag,iness::FrameEventPacket &_
             printf(" * WARNING! empty frame\n");
             continue;
         }
+        imshow("frame", frm_img); waitKey(5);
 
-        assert(ts_to_utc.count(ts) != 0);
+        if(ts_to_utc.count(ts) == 0 && utc_file.empty() == false){
+            printf("warning: you input a utc file, but its ts doesn't match with the adeat file\n") ;
+        }
+
         double utc = ts_to_utc[ts];
         std_msgs::Header hd;
         hd.seq = frame_seq++;
@@ -122,19 +128,21 @@ inline void polarityEventPacketCallback(rosbag::Bag &bag,iness::PolarityEventPac
 }
 
 int main(int argc, char **argv) {
-    if(argc != 3){
-        printf("usage: aedat_to_bag xxx.aedat utc.txt\n");
+    if(argc  != 2 && argc != 3){
+        printf("usage: aedat_to_bag xxx.aedat [utc.txt]\n");
         return 0;
     }
 
-    string aedat_file = argv[1];
-    string utc_file = argv[2];
-    ifstream utc_in(utc_file);
-    cout << utc_file << endl;
-    double ts, utc;
-    while(utc_in >> ts >> utc){
-        // cout << setprecision(13) << ts << " " << utc << endl;
-        ts_to_utc[ts] = utc;
+    aedat_file = argv[1];
+    if (argc == 3) {
+        utc_file = argv[2];
+        ifstream utc_in(utc_file);
+        cout << utc_file << endl;
+        double ts, utc;
+        while (utc_in >> ts >> utc) {
+            // cout << setprecision(13) << ts << " " << utc << endl;
+            ts_to_utc[ts] = utc;
+        }
     }
 
     iness::aedat::SimpleFileReader reader(aedat_file);
